@@ -16,11 +16,11 @@ mmu         .fill       8
             .dsection   pages
             .dsection   data
 
-*           = $a000     ; Application start.
+*           = $8000     ; Application start.
 start
             .text       $f2,$56     ; Signature
             .byte       1           ; 1 block
-            .byte       5           ; mount at $a000
+            .byte       4           ; mount at $8000
             .word       wget.run    ; Start here
             .byte       1           ; structure version
             .byte       0           ; reserved
