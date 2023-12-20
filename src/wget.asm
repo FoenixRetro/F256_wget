@@ -311,10 +311,16 @@ _msg1       .null   "WGET 1.0 Copyright 2023 Jessie Oberreuter, GPL3."
 _msg2       .null   "Like this? Please Paypal $10 to joberreu@moselle.com. Thanks!"
 
 cls
+            lda     #3
+            sta     io_ctrl
+            lda     $c000
+            jsr     _fill
+            
             lda     #2
             sta     io_ctrl
-            
             lda     #32
+            
+_fill
             ldy     #0
 _loop        
             sta     $c000+0*80,y
@@ -325,6 +331,7 @@ _loop
             iny
             cpy     #80
             bne     _loop
+
             clc
             rts
             
