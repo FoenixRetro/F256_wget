@@ -1,0 +1,36 @@
+WGET for the Foenix F256.
+Copyright 2023 Jessie Oberreuter <Gadget@HackwrenchLabs.com>.
+SPDX-License-Identifier: GPL-3.0-only
+
+This is a simple wget implementation for the Foenix F256.
+
+Usage:  wget url [filename]
+
+The filename is optional.  If omitted, wget will attempt to parse
+a filename out of the URL.  If the URL doesn't include a filename,
+'index.html' will be used.
+
+The filename may include a path specification, so if you have a
+"downloads" directory on your SDCard, you can use "downloads/foo.bar"
+for a filename.
+
+wget will NOT download to an IEC device ... the bus is just too slow.
+
+This is a *simple* wget.  It does not support TLS connections, chunked
+downloads, non-200 responses, [ip] hostnames, or non-standard ports.
+Support for all but the TLS feature could be easily added, but this
+is the state of 1.0 :).
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+    
+This code is distributed in the hope that it will be useful, but 
+WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+
+If you find this code useful, please consider sending $10 to the
+author via Paypal.  My address there is joberreu@moselle.com.
+
+                                 - Jessie Oberreuter (aka Gadget)
