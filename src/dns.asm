@@ -52,6 +52,10 @@ lookup
             jsr     _try
             bcc     _done
             jsr     _try
+            bcc     _done
+            jsr     _try
+            bcc     _done
+            jsr     _try
 _done
             rts            
 _try            
@@ -370,7 +374,7 @@ recv
             jsr     kernel.Clock.SetTimer 
             bcs     _out
 
-            adc     #120
+            adc     #60
             sta     kernel.args.timer.absolute
             lda     #kernel.args.timer.FRAMES
             sta     kernel.args.timer.units

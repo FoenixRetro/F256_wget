@@ -307,7 +307,7 @@ _done2
 
             clc
             rts
-_msg1       .null   "WGET 1.0 Copyright 2023 Jessie Oberreuter, GPL3."
+_msg1       .null   "WGET 1.0 Copyright 2023 Jessie Oberreuter."
 _msg2       .null   "Like this? Please Paypal $10 to joberreu@moselle.com. Thanks!"
 
 cls
