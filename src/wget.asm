@@ -69,15 +69,10 @@ run
 
           ; Init the io subsystem.
             jsr     io.init
-
-          ; Set http.url.
-            jsr     set_url
+            
+          ; Init the URL from args.
+            jsr     set_url_from_arg
             bcs     _failed
-
-          ; Set the file name.
-            jsr     set_filename
-            bcs     _failed
-            jsr     draw_filename
 
           ; Set http.accept.
             lda     #<file.accept
@@ -85,8 +80,8 @@ run
             lda     #>file.accept
             sta     http.accept+1
 
-          ; Init HTTP with the request.
-            jsr     http.init
+          ; Set up the request.
+            jsr     prepare_http_request
             bcs     _failed
 
           ; Try to download the data
@@ -108,6 +103,12 @@ _loop       lda     usage,y
             bra     _loop            
             
 try
+ lda #'t'
+ jsr putchar
+ lda #'r'
+ jsr putchar
+ lda #'y'
+ jsr putchar
           ; Open the file
             jsr     file.open
             bcc     +
@@ -118,7 +119,22 @@ try
             php
             jsr     file.close
             plp
+            bcc     _out
             
+          ; Did we fail because of a redirect?
+            lda     http.redirect_length
+            beq     _out
+            
+          ; Retry following the redirect.
+            lda     #<http.redirect
+            sta     http.url+0
+            lda     #>http.redirect
+            sta     http.url+1
+            lda     http.redirect_length
+            sta     http.url_len
+            jsr     prepare_http_request
+            sec
+_out
             rts
 
 success
@@ -161,7 +177,24 @@ end
             sta     kernel.args.run.block_id
             jmp     kernel.RunBlock
 
-set_url
+prepare_http_request
+
+          ; Normalize the URL.
+            jsr     normalize_url
+            bcs     _out
+
+          ; Set the file name.
+            jsr     set_filename
+            bcs     _out
+            jsr     draw_filename
+
+          ; Init HTTP with the request.
+            jsr     http.init
+_out
+            rts
+
+
+set_url_from_arg
           ; Copy the arg.
             ldy     #2
             lda     (argv),y
@@ -180,6 +213,13 @@ _ulen       lda     (http.url),y
 +           cpy     #0
             beq     _out
             sty     http.url_len
+            clc
+_out
+            rts
+
+normalize_url
+
+            ldy     http.url_len
             
           ; Find the last slash.
             lda     #'/'
@@ -307,7 +347,7 @@ _done2
 
             clc
             rts
-_msg1       .null   "WGET 1.0 Copyright 2023 Jessie Oberreuter."
+_msg1       .null   "WGET 1.1 Copyright 2023 Jessie Oberreuter."
 _msg2       .null   "Like this? Please Paypal $10 to joberreu@moselle.com. Thanks!"
 
 cls

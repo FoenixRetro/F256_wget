@@ -16,10 +16,12 @@ for a filename.
 
 wget will NOT download to an IEC device ... the bus is just too slow.
 
-This is a *simple* wget.  It does not support TLS connections, chunked
-downloads, non-200 responses, [ip] hostnames, or non-standard ports.
-Support for all but the TLS feature could be easily added, but this
-is the state of 1.0 :).
+This is a relatively simple wget. It does not support TLS connections, 
+chunked downloads, most non-200 responses, or [ip] hostnames.  Port
+redirects and "301 Moved Permanently" responses are supported, but note
+that many sites now refuse non-TLS requests, and some sites are even
+refusing connections from TCP/IP stacks which don't support modern
+congestion control.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

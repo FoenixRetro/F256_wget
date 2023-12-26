@@ -56,6 +56,8 @@ lookup
             jsr     _try
             bcc     _done
             jsr     _try
+            bcc     _done
+            jsr     _try
 _done
             rts            
 _try            

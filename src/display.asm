@@ -20,7 +20,19 @@ print_byte
             jsr     print_space
             pla
             rts
-            
+
+print_word
+            php
+            pha
+            lda     1,x
+            jsr     print_hex
+            lda     0,x
+            jsr     print_hex
+            jsr     print_space
+            pla
+            plp
+            rts
+  
 print_hex
             pha
             lsr     a

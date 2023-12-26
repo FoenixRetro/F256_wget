@@ -13,6 +13,7 @@ url_len         .byte       ?
 ptr             .word       ?
 read_size       .dword      ?
 block_size      .dword      ?
+port            .word       ?
                 .send
             
                 .section    data
@@ -20,18 +21,25 @@ accept          .word       ?   ; Send body bytes here.
 arg_offset      .byte       ?
 compare_length  .byte       ?
 line_length     .byte       ?
+redirect_length .byte       ?
 path_end        .byte       ?
 path_offset     .byte       ?
+port_scratch    .word       ?
+port_str_len    .byte       ?
                 .send                
 
                 .section    pages
 line            .fill       256
+redirect        .fill       256
+port_str        .fill       256
                 .send                
 
                 .section    strings
 http0           .ptext      "http/1.0 200 ok",$0d,$0a
 http1           .ptext      "http/1.1 200 ok",$0d,$0a
+moved           .ptext      "http/1.1 301 moved permanently",$0d,$0a
 content_length  .ptext      "content-length:"
+location        .ptext      "location:"
                 .send
 
             .section    code
@@ -53,11 +61,13 @@ init
             jsr     http.print_path
             jsr     print_cr
             jsr     http.print_request
+            jsr     print_port
 .endif                        
           ; Set the port.
-            lda     #80
+            lda     port+0
             sta     io.tcp.port+0
-            stz     io.tcp.port+1
+            lda     port+1
+            sta     io.tcp.port+1
             
             clc
 _out
@@ -123,7 +133,9 @@ _loop
             lda     _text,y
             beq     _done
             cmp     #'$'
-            beq     _insert
+            beq     _host
+            cmp     #'%'
+            beq     _port
             sta     io.tcp.tx_buf,x
             inx
 _next            
@@ -132,10 +144,14 @@ _next
 _done
             clc
             rts
-_insert
+_host
             jsr     insert_host
             jmp     _next
-_text       .text   "Host: $:80",$0d,$0a
+_port
+            jsr     insert_port
+            jmp     _next            
+_text       
+            .text   "Host: $:%",$0d,$0a
             .text   "Connection: close",$0d,$0a
             .text   $0d,$0a,0
 
@@ -157,13 +173,113 @@ _loop
             clc
             rts
 
+insert_port
+            tya
+            pha
+            
+            ldy     #0
+_loop
+            lda     port_str,y
+            sta     io.tcp.tx_buf,x
+            inx
+            iny
+            cpy     port_str_len
+            bne     _loop
+            
+            pla
+            tay
+            clc
+            rts
 
+
+port_init
+            lda     #80
+            sta     port+0
+            stz     port+1
+            lda     #'8'
+            sta     port_str+0
+            lda     #'0'
+            sta     port_str+1
+            lda     #2
+            sta     port_str_len
+            clc
+            rts
+
+port_zero
+            stz     port+0
+            stz     port+1
+            stz     port_str_len
+            rts
+            
+is_digit
+            cmp     #'0'
+            bcs     +
+            sec
+            rts
++           cmp     #'9'+1
+            rts
+
+port_append
+          ; Must be a decimal digit.
+            jsr     is_digit
+            bcs     _out
+
+          ; Append to port_string
+            ldx     port_str_len
+            sta     port_str,x
+            inx
+            stz     port_str,x
+            stx     port_str_len
+            
+          ; Stash the new digit while we mul port by 10.
+            pha
+
+          ; port_scratch = port * 2.
+            lda     port+0
+            asl     a
+            sta     port_scratch+0
+            lda     port+1
+            rol     a
+            sta     port_scratch+1
+            
+          ; port_scratch = port * 4.
+            asl     port_scratch+0
+            rol     port_scratch+1
+            
+          ; port = port * 5 (port += port_scratch)
+            lda     port+0
+            adc     port_scratch+0
+            sta     port+0
+            lda     port+1
+            adc     port_scratch+1
+            sta     port+1
+            
+          ; port = port * 10
+            asl     port+0
+            rol     port+1
+            
+          ; Add in the new digit
+            pla
+            eor     #48
+            clc
+            adc     port+0
+            sta     port+0
+            bcc     +
+            inc     port+1
++
+            clc
+_out                                              
+            rts     
+            
 parse_url
     ; IN:   line/line_length populated with the URL.
     ; OUT:  dns name/length and path offset/end initialized.
+
+          ; Init the port.
+            jsr     port_init
     
           ; Verify that it starts with "http://".
-            jsr     is_http
+            jsr     is_url
             sec
             bne     _out
             sty     dns.name_len    ; scratch
@@ -187,15 +303,16 @@ _host
             iny
             cpy     url_len
             bne     _host
-_colon
             bcs     _out
 _slash
           ; Set dns.name_len
-            tya
-            sec
-            sbc     dns.name_len
-            sta     dns.name_len
-            
+            jsr     _dns
+            bcc     _done
+_colon
+            jsr     _dns
+            jsr     parse_port
+            bcs     _out
+_done            
           ; The rest of the string is the path.
             sty     path_offset
             lda     url_len
@@ -204,7 +321,38 @@ _slash
             clc
 _out
             rts            
+_dns
+            tya
+            sec
+            sbc     dns.name_len
+            sta     dns.name_len
+            clc
+            rts
 
+parse_port
+            jsr     port_zero
+            bcc     _next
+_loop
+            lda     (url),y
+            cmp     #'/'
+            beq     _done
+            jsr     port_append            
+            bcs     _out
+_next            
+            iny
+            cpy     url_len
+            bcc     _loop
+            rts
+_done
+            clc
+_out
+            rts            
+
+is_url
+            jsr     is_http
+            bne     +
+            rts
++           jmp     is_https
 
 is_http
     ; IN:   ptr/len -> URL
@@ -227,6 +375,28 @@ _out
             clc
             rts            
 _http       .ptext  "http://"
+
+is_https
+    ; IN:   ptr/len -> URL
+    ; OUT:  y=end, carry clear, Z set on match.
+
+            lda     _https
+            cmp     url_len
+            bcs     _out
+
+            ldy     #0
+_loop
+            lda     (url),y
+            jsr     tolower
+            cmp     _https+1,y
+            bne     _out
+            iny
+            cpy     _https
+            bne     _loop
+_out
+            clc
+            rts            
+_https      .ptext  "https://"
 
 tolower
             cmp     #'A'
@@ -251,11 +421,22 @@ _out
             rts            
 
 parse_http
+            stz     redirect_length
+
             jsr     parse_protocol
+            bcc     _body
+            
+            jsr     is_redirect
             bcs     _out
 
+            jmp     parse_headers
+
+_body
             jsr     parse_headers
             bcs     _out
+
+            lda     redirect_length
+            bne     _out
 
             jsr     parse_body
 _out            
@@ -278,6 +459,15 @@ parse_protocol
             sec
 _out
             rts            
+
+is_redirect
+            lda     line_length
+            ldy     #<moved
+            jsr     compare_line
+            beq     +
+            sec
++           rts
+
 
 compare_line
     ; IN:   A = length, Y -> pstring to compare.
@@ -313,17 +503,13 @@ _loop
             jsr     io.tcp.read_byte
             bcs     _error
 
-.if false
- pha
- jsr putchar
- pla
-.endif
-
             sta     line,y
             iny
             beq     _over
 
             cmp     #':'
+            bne     _next
+            ldx     arg_offset
             bne     _next
             sty     arg_offset
 _next
@@ -357,12 +543,45 @@ _loop
             ldx     #block_size
             jsr     parse_number
             jsr     print_number
-+           nop
-            
+            bra     _loop
++
+          ; If it's a redirect, parse the new url.
+            lda     arg_offset
+            ldy     #<location
+            jsr     compare_line
+            bne     +
+            jsr     parse_redirect
+            sec
+            rts
++            
             jmp     _loop
 
 _done
             rts
+
+parse_redirect
+
+            ldy     arg_offset
+            jsr     skip_spaces
+            bcs     _out
+            ldx     #0
+_loop
+            lda     line,y
+            cmp     #32
+            bcc     _done
+            sta     redirect,x
+
+            inx
+            iny
+            bne     _loop
+_done
+          ; Terminate the string like an arg.
+            stz     redirect,x
+            stx     redirect_length
+            clc
+_out            
+            rts            
+                        
 
 parse_number
     ; IN:   x -> dword, y = offset of colon in line buffer.
@@ -509,7 +728,7 @@ _done
 _accept
             jmp     (accept)
             
-print_path: rts
+print_path: 
             ldy     http.path_offset
 _loop
             lda     (http.url),y
@@ -520,7 +739,7 @@ _loop
             clc
             rts
 
-print_request: rts
+print_request: 
             ldy     #0
 _loop
             lda     io.tcp.tx_buf,y
@@ -538,6 +757,14 @@ print_remaining
             plx
             rts
             
-
+print_port
+            php
+            phx
+            ldx     #port
+            jsr     print_word
+            plx
+            plp
+            rts
+            
             .send
             .endn
