@@ -6,8 +6,8 @@ This is a simple wget implementation for the Foenix F256.
 
 Usage:  wget url [filename]
 
-The filename is optional.  If omitted, wget will attempt to parse
-a filename out of the URL.  If the URL doesn't include a filename,
+The filename is optional. If omitted, wget will attempt to parse a
+filename out of the URL. If the URL doesn't include a filename,
 'index.html' will be used.
 
 The filename may include a path specification, so if you have a
@@ -16,20 +16,20 @@ for a filename.
 
 wget will NOT download to an IEC device ... the bus is just too slow.
 
-This is a relatively simple wget. It does not support TLS connections, 
-chunked downloads, most non-200 responses, or [ip] hostnames.  Port
-redirects and "301 Moved Permanently" responses are supported, but note
-that many sites now refuse non-TLS requests, and some sites are even
-refusing connections from TCP/IP stacks which don't support modern
+This is a relatively simple wget. It does not support TLS connections,
+chunked downloads, and most non-200 responses. Port redirects and "301
+Moved Permanently" responses are supported, but note that many sites
+now refuse non-TLS requests, and some sites are even refusing
+connections from TCP/IP stacks which don't support contemporary
 congestion control.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+the Free Software Foundation, either version 3 of the License, or (at
+your option) any later version.
     
-This code is distributed in the hope that it will be useful, but 
-WITHOUT ANY WARRANTY; without even the implied warranty of 
+This code is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
 
 If you find this code useful, please consider sending $10 to the
