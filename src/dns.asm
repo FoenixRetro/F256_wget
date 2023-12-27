@@ -9,6 +9,7 @@ dns         .namespace
             .section    dp
 name_len    .byte       ?   ; length of the name.
 name_addr   .word       ?   ; address of the name.
+ip          .dword      ?   ; address in network order.
             .send
 
             .section    data
@@ -18,7 +19,6 @@ cookie      .byte       ?
 type        .byte       ?
 class       .byte       ?
 data        .byte       ?
-ip          .dword      ?   ; address in network order.
             .send            
 
             .section    pages
@@ -47,6 +47,12 @@ data        .ends
 
 
 lookup
+
+          ; Could be an IP address :).
+            jsr     parse_ip
+            bcc     _done
+
+          ; Nope, ask Google to resolve it.
             jsr     _try
             bcc     _done
             jsr     _try
@@ -89,6 +95,107 @@ _try
             ;jsr     putchar
             jmp     recv
                     
+
+parse_ip
+            ldy     #0
+
+            ldx     #ip
+            jsr     parse_number
+            bcs     _out
+            iny
+
+            inx
+            jsr     parse_number
+            bcs     _out
+            iny
+                        
+            inx
+            jsr     parse_number
+            bcs     _out
+            iny
+                        
+            inx
+            jsr     parse_number
+            bcs     _out
+
+            tya
+            eor     name_len
+            beq     _out
+            sec
+_out
+            rts
+            
+parse_number
+    ; X->result, Y->next_character
+
+            cpy     name_len
+            bcs     _out
+            stz     0,x
+_loop
+            lda     (name_addr),y
+            cmp     #'0'
+            bcs     +
+            
+            eor     #'.'
+            beq     _out
+            
++           cmp     #'9'+1
+            bcs     _out
+            
+
+            pha
+            lda     0,x
+            asl     a
+            asl     a
+            adc     0,x
+            asl     a
+            sta     0,x
+            pla
+            eor     #'0'
+            adc     0,x
+            sta     0,x
+            
+            iny
+            cpy     name_len
+            bcc     _loop
+            clc
+_out
+            rts                        
+
+.if false
+print_ip
+            ldx     #80-10
+            lda     ip+0
+            jsr     print_hex
+            lda     ip+1
+            jsr     print_hex
+            lda     ip+2
+            jsr     print_hex
+            lda     ip+3
+            jsr     print_hex
+            rts
+print_hex
+            pha
+            lsr     a
+            lsr     a
+            lsr     a
+            lsr     a
+            jsr     _nibble
+            pla
+_nibble
+            and     #$0f
+            phy
+            tay
+            lda     _digits,y
+            ldy     #2
+            sty     io_ctrl
+            ply
+            sta     $c000,x
+            inx
+            clc
+            rts
+_digits     .text   "0123456789abcdef"            
+.endif 
 
 dump_request
     rts
