@@ -4,7 +4,13 @@ SPDX-License-Identifier: GPL-3.0-only
 
 This is a simple wget implementation for the Foenix F256.
 
-Usage:  wget url [filename]
+Usage:  wget path [filename]
+
+The path may be either a url or the name of a file on the SD card
+followed by a path, eg "myserver/foo.bin".  In this second case,
+wget will attempt to use the first line found in the file as a
+prefix.  For example, if myserver contained "http://192.168.1.1",
+then the effective url would be "http://192.168.1.1/foo.bin".
 
 The filename is optional. If omitted, wget will attempt to parse a
 filename out of the URL. If the URL doesn't include a filename,
@@ -27,10 +33,10 @@ This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or (at
 your option) any later version.
-    
+
 This code is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 If you find this code useful, please consider sending $10 to the
 author via Paypal.  My address there is joberreu@moselle.com.

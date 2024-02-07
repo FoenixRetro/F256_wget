@@ -39,6 +39,11 @@ wget        .namespace
             .section    dp
 argc        .byte       ?
 argv        .word       ?
+relpath     .byte       ?   ; Start of prefix-relative path.
+            .send
+
+            .section    pages
+path        .fill       256
             .send
 
             .section    code
@@ -196,6 +201,7 @@ _out
 
 
 set_url_from_arg
+
           ; Copy the arg.
             ldy     #2
             lda     (argv),y
@@ -204,11 +210,18 @@ set_url_from_arg
             lda     (argv),y
             sta     http.url+1
 
+          ; Full request?
+            jsr     _length
+            jsr     http.is_url
+            beq     +
+            jsr     prefix
+            bcs     _out
++
           ; Compute the length
+_length
             ldy     #0
 _ulen       lda     (http.url),y
             beq     +
-            ;jsr     putchar
             iny
             bra     _ulen
 +           cpy     #0
@@ -348,7 +361,7 @@ _done2
 
             clc
             rts
-_msg1       .null   "WGET 1.1.1 Copyright 2023 Jessie Oberreuter."
+_msg1       .null   "WGET 1.2 Copyright 2023 Jessie Oberreuter."
 _msg2       .null   "Like this? Please Paypal $10 to joberreu@moselle.com. Thanks!"
 
 cls
@@ -389,6 +402,206 @@ _done
             clc
             rts
 
+prefix
+    ; IN:   http_url -> file path
+    ; OUT:  http_url -> url, url_len set.
+    ;       Carry set on error.
+
+    ; Path starts with a filename.
+    ; Parse it out, read the file,
+    ; and prefix the path with the
+    ; file's contents.
+
+            jsr     find_path
+            bcs     _out
+            sty     relpath
+            jsr     read_path
+            bcs     _out
+            jsr     find_end
+            bcs     _out
+            jsr     append_url
+_out
+            rts
+
+find_path
+            ldy     #0
+_loop
+            lda     (http.url),y
+            beq     _out
+            sta     path,y
+            eor     #'/'
+            beq     _out
+            iny
+            bne     _loop
+            sec
+_out
+            rts
+
+read_path
+    ; IN:   path contains the filename; Y=len.
+    ; OUT:  Y = prefix length, or carry set on error.
+
+          ; Allocate space on the stack for the data length.
+            phx
+            phy
+            tsx
+
+          ; Set the drive; only the SDC is fast enough.
+            stz     kernel.args.file.open.drive
+
+          ; Set the fname and len.
+            lda     #<path
+            sta     kernel.args.file.open.fname+0
+            lda     #>path
+            sta     kernel.args.file.open.fname+1
+            sty     kernel.args.file.open.fname_len
+
+          ; Set the mode.  For now, always overwrite.
+            lda     #kernel.args.file.open.READ
+            sta     kernel.args.file.open.mode
+
+          ; Set the cookie (not used)
+            stz     kernel.args.file.open.cookie
+
+          ; Submit the request
+            jsr     kernel.File.Open
+            bcs     _out
+            sta     kernel.args.file.read.stream
+
+          ; Wait for the operation to complete.
+            lda     #kernel.event.file.OPENED
+            jsr     file_wait
+            bcs     _out
+
+          ; Read the first chunk of the file.
+            lda     #$ff
+            sta     kernel.args.file.read.buflen
+            jsr     kernel.File.Read
+            bcs     _close
+
+          ; Wait for the operation to complete.
+          ; Should normally loop but (cheating),
+          ; I know this program only works with fat32,
+          ; which always reads fully.
+            lda     #kernel.event.file.DATA
+            jsr     file_wait
+            bcs     _close
+
+          ; Stash the # of bytes read.
+            lda     io.event.file.data.read
+            sta     $101,x
+
+          ; Copy the data (reusing 'path')
+            sta     kernel.args.recv.buflen
+            lda     #<path
+            sta     kernel.args.recv.buf+0
+            lda     #>path
+            sta     kernel.args.recv.buf+1
+            jsr     kernel.ReadData
+            clc
+_close
+            php     ; Might have gotten here on an error.
+            jsr     kernel.File.Close
+            bcs     +
+            lda     #kernel.event.file.CLOSED
+            jsr     file_wait
++           plp
+
+_out
+            ply
+            plx
+            rts
+
+
+
+file_wait
+    ; Waits for a file event.
+    ; Carry clear if the event is the expected event.
+    ; IN:   A = expected event.
+
+            phx
+            pha
+            tsx
+_loop
+            jsr     kernel.NextEvent
+            bcs     _loop
+            lda     io.event.type
+            cmp     #kernel.event.file.NOT_FOUND
+            bcc     _loop
+            cmp     #kernel.event.file.SEEK+2
+            bcs     _loop
+            eor     $101,x
+            beq     _out
+_fail
+            sec
+_out
+            pla
+            plx
+
+            lda     io.event.type
+            rts
+
+find_end
+    ; IN:   path loaded, Y=length.
+    ; OUT:  y = trimmed length.
+
+            phx
+            phy
+            tsx
+
+          ; The path needs to be at least long enough
+          ; to be an http://<host> string.
+            lda     #10
+            cmp     $101,x
+            bcs     _out
+
+            ldy     #0
+_loop
+            lda     path,y
+            cmp     #33
+            bcc     _out
+            iny
+            beq     _out
+            tya
+            cmp     $101,x
+            bne     _loop
+            clc
+_out
+            pla
+            plx
+            rts
+
+append_url
+    ; IN:   Y = path end, relpath = start of relative path.
+
+            phx
+            tya
+            tax
+            ldy     relpath
+_loop
+            lda     (http.url),y
+            beq     _export
+            sta     path,x
+            inx
+            beq     _fail
+            iny
+            beq     _fail
+            bra     _loop
+_fail
+            sec
+            bra     _out
+_export
+            lda     #0
+            sta     path,x
+            lda     #<path
+            sta     http.url+0
+            lda     #>path
+            sta     http.url+1
+            stx     http.url_len
+            clc
+_out
+            plx
+            rts
 
             .send
             .endn
