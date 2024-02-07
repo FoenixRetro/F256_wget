@@ -47,6 +47,10 @@ run
           ; trash our signature.
             stz     start
 
+          ; Init the io subsystem.
+            jsr     io.init
+
+
           ; Init the screen.
             jsr     display.screen_init
             jsr     banner
@@ -57,9 +61,9 @@ run
             beq     _help
             dec     a
             beq     _help
-            sta     argc 
+            sta     argc
             cmp     #3
-            bcs     _help            
+            bcs     _help
 
           ; Copy the argv ptr before it can get trashed.
             lda     kernel.args.ext+0
@@ -67,9 +71,6 @@ run
             lda     kernel.args.ext+1
             sta     argv+1
 
-          ; Init the io subsystem.
-            jsr     io.init
-            
           ; Init the URL from args.
             jsr     set_url_from_arg
             bcs     _failed
@@ -100,8 +101,8 @@ _loop       lda     usage,y
             beq     _failed
             jsr     putchar
             iny
-            bra     _loop            
-            
+            bra     _loop
+
 try
  lda #'t'
  jsr putchar
@@ -113,18 +114,18 @@ try
             jsr     file.open
             bcc     +
             rts
-+            
++
           ; Make the request
             jsr     http.perform_request
             php
             jsr     file.close
             plp
             bcc     _out
-            
+
           ; Did we fail because of a redirect?
             lda     http.redirect_length
             beq     _out
-            
+
           ; Retry following the redirect.
             lda     #<http.redirect
             sta     http.url+0
@@ -142,9 +143,9 @@ success
             clc
             adc     file.fname_len
             sta     display.cursor
-            
+
             ldy     #0
-_loop                        
+_loop
             lda     _msg,y
             beq     _done
             jsr     putchar
@@ -153,7 +154,7 @@ _loop
 _done       jmp     end
 _msg        .text   "Success!"
             .null   "  Press any key to continue."
-            
+
 error
             ldy     #0
 _loop
@@ -163,7 +164,7 @@ _loop
             iny
             bra     _loop
 _done       jmp     end
-_text       .text   "Failed."
+_text       .text   "  Failed."
             .null   "  Press any key to continue."
 
 end
@@ -220,7 +221,7 @@ _out
 normalize_url
 
             ldy     http.url_len
-            
+
           ; Find the last slash.
             lda     #'/'
             bra     _next
@@ -231,7 +232,7 @@ _next
             dey
             bne     _slash
             sec
-_out            
+_out
             rts
 
 _found
@@ -247,8 +248,8 @@ _fix
             sta     (http.url),y
             inc     http.url_len
             clc
-            rts                    
-                        
+            rts
+
 set_filename
 
           ; If no name is provided, parse it from the URL.
@@ -274,7 +275,7 @@ _loop       lda     (file.fname),y
 _done       sty     file.fname_len
             clc
             rts
-                                    
+
 
 parse_filename
     ; IN:   url/end
@@ -298,7 +299,7 @@ _next       dey
             sec
 _out
             rts
-_found            
+_found
             iny
             tya
             clc
@@ -315,7 +316,7 @@ _found
             sta     file.fname_len
             clc
             rts
-            
+
 _index
             lda     #<(index_html+1)
             sta     file.fname+0
@@ -347,7 +348,7 @@ _done2
 
             clc
             rts
-_msg1       .null   "WGET 1.1 Copyright 2023 Jessie Oberreuter."
+_msg1       .null   "WGET 1.1.1 Copyright 2023 Jessie Oberreuter."
 _msg2       .null   "Like this? Please Paypal $10 to joberreu@moselle.com. Thanks!"
 
 cls
@@ -355,14 +356,14 @@ cls
             sta     io_ctrl
             lda     $c000
             jsr     _fill
-            
+
             lda     #2
             sta     io_ctrl
             lda     #32
-            
+
 _fill
             ldy     #0
-_loop        
+_loop
             sta     $c000+0*80,y
             sta     $c000+1*80,y
             sta     $c000+2*80,y
@@ -374,7 +375,7 @@ _loop
 
             clc
             rts
-            
+
 draw_filename
             ldy     #0
 _loop
@@ -386,9 +387,8 @@ _loop
             bne     _loop
 _done
             clc
-            rts            
-            
+            rts
+
 
             .send
             .endn
-        
